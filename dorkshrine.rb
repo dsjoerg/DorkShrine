@@ -1,4 +1,4 @@
-#!/Users/david/.rvm/rubies/ruby-1.9.3-p429/bin/ruby
+#!/usr/bin/env ruby
 require 'curb'
 require 'json'
 
