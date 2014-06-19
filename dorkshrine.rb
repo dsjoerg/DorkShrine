@@ -1,11 +1,6 @@
 #!/Users/david/.rvm/rubies/ruby-1.9.3-p429/bin/ruby
-
 require 'curb'
 require 'json'
-
-# TODO remove DJ_IDENTITY, make it into an argument with a default of 1455
-# TODO fix the first line ruby invocation
-# TODO add a mode where you can specify a match ID
 
 def minutes_to_display(minutes)
   minutes.to_i.to_s + ':' + ('%02i' % (60 * minutes.modulo(1)))
