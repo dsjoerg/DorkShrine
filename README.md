@@ -6,6 +6,12 @@ A fun program to tell you how well you executed a [specific PvZ build](http://gg
 It uses the GGTracker API.  Someday it will do more stuff!
 
 
+First Things First
+------------------
+
+`bundle install`
+
+
 
 Examples
 --------
@@ -13,7 +19,7 @@ Examples
 Give it a GGTracker match ID.
 
 ```
-> ./dorkshrine.rb -m 5139159
+> bundle exec ./dorkshrine.rb -m 5139159
 
 Map                            Merry Go Round LE
 Enemy                          Zerg
@@ -31,7 +37,7 @@ Alternatively, you can give it your GGTracker player ID and it will
 show you analysis for your latest PvZ match.
 
 ```
-> ./dorkshrine.rb -p 1455
+> bundle exec ./dorkshrine.rb -p 1455
 
 Map                            Merry Go Round LE
 Enemy                          Zerg
