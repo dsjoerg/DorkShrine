@@ -2,6 +2,8 @@
 require 'curb'
 require 'json'
 require 'optparse'
+require 'time_ago_in_words'
+require 'time'
 
 def minutes_to_display(minutes)
   minutes.to_i.to_s + ':' + ('%02i' % (60 * minutes.modulo(1)))
@@ -56,21 +58,37 @@ end
 # from ./dorkshrine.rb -m 5116849
 MILESTONES = [
   [ "22 probes                   ", 4, 17,
-    Proc.new{|army|
+    Proc.new{|match|
+      army = match["army"]
       army["probe"] >= 22.0
     }],
   [ "6 sentries, zealot, stalker ", 7, 53,
-    Proc.new{|army|
+    Proc.new{|match|
+      army = match["army"]
       army["stalker"] >= 1.0 && army["zealot"] >= 1.0 && army["sentry"] >= 6.0
     }],
   [ "44 probes                   ", 7, 56,
-    Proc.new{|army|
+    Proc.new{|match|
+      army = match["army"]
       army["probe"] >= 44.0
     }],
   [ "66 probes                   ", 10, 55,
-    Proc.new{|army|
+    Proc.new{|match|
+      army = match["army"]
       army["probe"] >= 66.0
-    }]
+    }],
+  [ "First scout command", 1, 13,
+    Proc.new{|match|
+      match["first_scout_command_frame"]
+      }],
+  [ "Second base started", 3, 41,
+    Proc.new{|match|
+      match["second_base"]
+      }],
+  [ "First scout command", 8, 8,
+    Proc.new{|match|
+      match["third_base"]
+      }],
 ]
 
 def expansion_times(base_lives)
@@ -118,6 +136,9 @@ def analyze_match(the_match)
   our_base_lives = matchblob['num_bases'].select{|part| part[0] == $player_id}[0][1]
   ets = expansion_times(our_base_lives)
   ets = ets.map{|et| [0, et - BASE_BUILD_FRAMES].max}
+  the_match['second_base'] = ets[0]
+  the_match['third_base'] = ets[1]
+
 
   # get scouting time
   scouting_info = matchblob['scouting']
@@ -127,31 +148,39 @@ def analyze_match(the_match)
   else
     first_scout_command_frame = matchblob['scouting'][$player_id.to_s]
   end
+  the_match['first_scout_command_frame'] = first_scout_command_frame
 
-  # get time at which we have 6 sentries, zealot, and a stalker
+  the_match['army'] = Hash.new(0.0)
+  milestone_frames = Array.new()
+
+  # some milestone times are already known. lets get those first
+  MILESTONES.each_with_index{ |milestone, i|
+    milestone_result = milestone[3].call(the_match)
+    if milestone_result.class == Fixnum
+      milestone_frames[i] = milestone_result
+    end
+  }
+    
+  # other milestones require us to walk through the birth and death of
+  # each unit.  lets make a list of each of those 'events'
   the_abf = matchblob['armies_by_frame'][$player_id.to_s]
   the_events = abf_to_events(the_abf)
-  milestone_frames = Array.new()
-  the_army = Hash.new(0.0)
 
-  # walk through them, keeping track of army
+  # walk through them, keeping track of army as we go, checking to see
+  # at each time if a milestone has been hit
   the_events.each{ |event|
-    the_army[event[1]] += event[2]
+    the_match['army'][event[1]] += event[2]
     MILESTONES.each_with_index{ |milestone, i|
-      if milestone_frames[i].nil? && milestone[3].call(the_army)
+      if milestone_frames[i].nil? && milestone[3].call(the_match)
         milestone_frames[i] = event[0]
       end
     }
   }
 
-  benchmarks = [
-                ["First scout command", first_scout_command_frame,   1, 13],
-                ["Second base started", ets[0],        3, 41],
-                ["Third base started", ets[1],        8, 8],
-               ]
+  milestones_achieved = []
 
   MILESTONES.each_with_index {|milestone, i|
-    benchmarks <<
+    milestones_achieved <<
     [
      milestone[0],
      milestone_frames[i],
@@ -159,8 +188,8 @@ def analyze_match(the_match)
     ]
   }
 
-  # show benchmarks in the order that the player achieved them
-  benchmarks.sort! { |a,b|
+  # show milestones_achieved in the order that the player achieved them
+  milestones_achieved.sort! { |a,b|
     a_time = a[1]
     b_time = b[1]
     if a_time.nil? || a_time == 0
@@ -172,19 +201,20 @@ def analyze_match(the_match)
     a_time <=> b_time
   }
 
+  puts "%-30s %s" % ["Played", Time.parse(the_match['ended_at']).ago_in_words]
   puts "%-30s %s" % ["Map", the_match['map_name']]
   puts "%-30s %s" % ["Enemy", "#{describe_enemy(enemy_entity)}"]
-  benchmarks.each {|benchmark|
-    goal_seconds = benchmark[2] * 60 + benchmark[3]
+  milestones_achieved.each {|milestone_achieved|
+    goal_seconds = milestone_achieved[2] * 60 + milestone_achieved[3]
     goal_frames = goal_seconds * FRAMES_PER_SECOND
-    if benchmark[1].nil? || benchmark[1] == 0 || benchmark[1] > goal_frames + (GOAL_SLIPPAGE_SECONDS_PERMITTED * FRAMES_PER_SECOND)
+    if milestone_achieved[1].nil? || milestone_achieved[1] == 0 || milestone_achieved[1] > goal_frames + (GOAL_SLIPPAGE_SECONDS_PERMITTED * FRAMES_PER_SECOND)
       goal_grade = "WORK ON THIS"
-    elsif benchmark[1] >= goal_frames
+    elsif milestone_achieved[1] >= goal_frames
       goal_grade = "   GOOD!    "
     else
       goal_grade = "  GREAT!    "
     end
-    puts "%-30s %5s %12s (goal: %5s)" % [benchmark[0], frames_to_display(benchmark[1]), goal_grade, frames_to_display(goal_frames)]
+    puts "%-30s %5s %12s (goal: %5s)" % [milestone_achieved[0], frames_to_display(milestone_achieved[1]), goal_grade, frames_to_display(goal_frames)]
   }
 
   puts "%-30s %s" % ["Game over", seconds_to_display(the_match['duration_seconds'])]
@@ -207,6 +237,8 @@ if $player_id.nil? == $match_id.nil?
   $stderr.puts "Usage: dorkshrine.rb [-p <player_id> [-n num_to_show] | -m <match_id>]"
   exit
 end
+
+# for each benchmark track how many times you got at least a good
 
 if $match_id.nil?
   # get latest PvZ for the indicated player
