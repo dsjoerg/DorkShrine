@@ -242,7 +242,7 @@ end
 
 if $match_id.nil?
   # get latest PvZ for the indicated player
-  matches = json_from_url("http://api.ggtracker.com/api/v1/matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&race=protoss&game_type=1v1&limit=#{$num_to_show}")
+  matches = json_from_url("http://api.ggtracker.com/api/v1/matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&race=protoss&vs_race=zerg&game_type=1v1&limit=#{$num_to_show}")
   matches["collection"].each {|match|
     analyze_match(match)
     puts ""
