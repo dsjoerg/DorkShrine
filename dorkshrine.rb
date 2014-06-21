@@ -57,6 +57,14 @@ end
 
 # from ./dorkshrine.rb -m 5116849
 MILESTONES = [
+  [ "First scout command", 1, 13,
+    Proc.new{|match|
+      match["first_scout_command_frame"]
+      }],
+  [ "Second base started", 3, 41,
+    Proc.new{|match|
+      match["second_base"]
+      }],
   [ "22 probes                   ", 4, 17,
     Proc.new{|match|
       army = match["army"]
@@ -72,23 +80,15 @@ MILESTONES = [
       army = match["army"]
       army["probe"] >= 44.0
     }],
+  [ "Third base started", 8, 8,
+    Proc.new{|match|
+      match["third_base"]
+      }],
   [ "66 probes                   ", 10, 55,
     Proc.new{|match|
       army = match["army"]
       army["probe"] >= 66.0
     }],
-  [ "First scout command", 1, 13,
-    Proc.new{|match|
-      match["first_scout_command_frame"]
-      }],
-  [ "Second base started", 3, 41,
-    Proc.new{|match|
-      match["second_base"]
-      }],
-  [ "First scout command", 8, 8,
-    Proc.new{|match|
-      match["third_base"]
-      }],
 ]
 
 def expansion_times(base_lives)
@@ -118,7 +118,7 @@ FRAMES_PER_SECOND = 16
 GOAL_SLIPPAGE_SECONDS_PERMITTED = 30
 BASE_BUILD_FRAMES = 100 * FRAMES_PER_SECOND
 
-def analyze_match(the_match)
+def analyze_match(the_match, milestone_counter)
 
   entities = the_match['entities']
   our_entity = entities.select{|entity| entity['race'] == 'P'}[0]
@@ -180,11 +180,23 @@ def analyze_match(the_match)
   milestones_achieved = []
 
   MILESTONES.each_with_index {|milestone, i|
+    goal_seconds = milestone[1] * 60 + milestone[2]
+    goal_frames = goal_seconds * FRAMES_PER_SECOND
+    if milestone_frames[i].nil? || milestone_frames[i] == 0 || milestone_frames[i] > goal_frames + (GOAL_SLIPPAGE_SECONDS_PERMITTED * FRAMES_PER_SECOND)
+      goal_grade = "WORK ON THIS"
+    elsif milestone_frames[i] >= goal_frames
+      goal_grade = "   GOOD!    "
+      milestone_counter[i] += 1
+    else
+      goal_grade = "  GREAT!    "
+      milestone_counter[i] += 1
+    end
+
     milestones_achieved <<
     [
      milestone[0],
      milestone_frames[i],
-     milestone[1], milestone[2]
+     goal_frames, goal_grade
     ]
   }
 
@@ -205,16 +217,7 @@ def analyze_match(the_match)
   puts "%-30s %s" % ["Map", the_match['map_name']]
   puts "%-30s %s" % ["Enemy", "#{describe_enemy(enemy_entity)}"]
   milestones_achieved.each {|milestone_achieved|
-    goal_seconds = milestone_achieved[2] * 60 + milestone_achieved[3]
-    goal_frames = goal_seconds * FRAMES_PER_SECOND
-    if milestone_achieved[1].nil? || milestone_achieved[1] == 0 || milestone_achieved[1] > goal_frames + (GOAL_SLIPPAGE_SECONDS_PERMITTED * FRAMES_PER_SECOND)
-      goal_grade = "WORK ON THIS"
-    elsif milestone_achieved[1] >= goal_frames
-      goal_grade = "   GOOD!    "
-    else
-      goal_grade = "  GREAT!    "
-    end
-    puts "%-30s %5s %12s (goal: %5s)" % [milestone_achieved[0], frames_to_display(milestone_achieved[1]), goal_grade, frames_to_display(goal_frames)]
+    puts "%-30s %5s %12s (goal: %5s)" % [milestone_achieved[0], frames_to_display(milestone_achieved[1]), milestone_achieved[3], frames_to_display(milestone_achieved[2])]
   }
 
   puts "%-30s %s" % ["Game over", seconds_to_display(the_match['duration_seconds'])]
@@ -240,14 +243,24 @@ end
 
 # for each benchmark track how many times you got at least a good
 
+milestone_counter = Array.new(MILESTONES.count, 0)
+
 if $match_id.nil?
   # get latest PvZ for the indicated player
   matches = json_from_url("http://api.ggtracker.com/api/v1/matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&race=protoss&vs_race=zerg&game_type=1v1&limit=#{$num_to_show}")
   matches["collection"].each {|match|
-    analyze_match(match)
+    analyze_match(match, milestone_counter)
     puts ""
   }
 else
   the_match = json_from_url("http://api.ggtracker.com/api/v1/matches/#{$match_id}.json")
-  analyze_match(the_match)
+  analyze_match(the_match, milestone_counter)
+end
+
+if $num_to_show > 1
+  puts "SUMMARY"
+  puts "-------"
+  MILESTONES.each_with_index {|milestone, i|
+    puts "%-30s %3.0f%%    (%i)" % [milestone[0], 100.0 * milestone_counter[i] / $num_to_show, milestone_counter[i]]
+  }
 end
