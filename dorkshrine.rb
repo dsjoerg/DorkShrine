@@ -261,6 +261,6 @@ if $num_to_show > 1
   puts "SUMMARY"
   puts "-------"
   MILESTONES.each_with_index {|milestone, i|
-    puts "%-30s %3.0f%%    (%i)" % [milestone[0], 100.0 * milestone_counter[i] / $num_to_show, milestone_counter[i]]
+    puts "%-30s %3.0f%%    (%i/%i)" % [milestone[0], 100.0 * milestone_counter[i] / $num_to_show, milestone_counter[i], $num_to_show]
   }
 end
