@@ -84,10 +84,28 @@ MILESTONES = [
     Proc.new{|match|
       match["third_base"]
       }],
+  [ "+1 attack complete", 9, 49,
+    Proc.new{|match|
+      weapons = match['our_upgrades'].find{|upgrade| upgrade[0] == 'ProtossGroundWeaponsLevel1'}
+      if weapons.nil?
+        nil
+      else
+        weapons[1]
+      end
+    }],
   [ "66 probes                   ", 10, 55,
     Proc.new{|match|
       army = match["army"]
       army["probe"] >= 66.0
+    }],
+  [ "+2 attack complete", 13, 4,
+    Proc.new{|match|
+      weapons = match['our_upgrades'].find{|upgrade| upgrade[0] == 'ProtossGroundWeaponsLevel2'}
+      if weapons.nil?
+        nil
+      else
+        weapons[1]
+      end
     }],
 ]
 
@@ -152,6 +170,9 @@ def analyze_match(the_match, milestone_counter)
 
   the_match['army'] = Hash.new(0.0)
   milestone_frames = Array.new()
+
+  # put our player's upgrades in an easy-to-get-place
+  the_match['our_upgrades'] = matchblob['upgrades'][$player_id.to_s]
 
   # some milestone times are already known. lets get those first
   MILESTONES.each_with_index{ |milestone, i|
