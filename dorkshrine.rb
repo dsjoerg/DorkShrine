@@ -184,13 +184,17 @@ BASE_BUILD_FRAMES = 100 * FRAMES_PER_SECOND
 def analyze_match(the_match, milestone_achieved_counter, milestone_applicable_counter)
 
   entities = the_match['entities']
-  our_entity = entities.select{|entity| entity['race'] == 'P'}[0]
+  if $player_id
+    our_entity = entities.select{|entity| entity['identity']['id'] == $player_id}[0]
+  else
+    our_entity = entities.select{|entity| entity['race'] == 'P'}[0]
+  end
   if our_entity.nil?
     puts "Hmm, doesn't look like there was a Protoss player in match ##{the_match['id']}"
     exit
   end
   $player_id = our_entity['identity']['id']
-  enemy_entity = entities.reject{|entity| entity['race'] == 'P'}[0]
+  enemy_entity = entities.reject{|entity| entity == our_entity}[0]
 
   # get match blob
   matchblob = retrieve_json($ggtracker_blob_url_prefix + "#{the_match['id']}")
