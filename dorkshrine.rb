@@ -271,6 +271,8 @@ def analyze_match(the_match, milestone_achieved_counter, milestone_applicable_co
     goal_frames = goal_seconds * FRAMES_PER_SECOND
     if milestone_results[i] && !milestone_results[i].applicable
       goal_grade = "    N/A     "
+    elsif the_match['duration_seconds'] < (goal_frames / FRAMES_PER_SECOND)
+      goal_grade = "    N/A     "
     elsif milestone_results[i].nil? || milestone_results[i].frameWhenAchieved == 0 || milestone_results[i].frameWhenAchieved.nil? || milestone_results[i].frameWhenAchieved > goal_frames + (GOAL_SLIPPAGE_SECONDS_PERMITTED * FRAMES_PER_SECOND)
       milestone_applicable_counter[i] += 1
       goal_grade = "WORK ON THIS"
