@@ -4,6 +4,8 @@ require 'json'
 require 'optparse'
 require 'time_ago_in_words'
 require 'time'
+require 'digest'
+require 'fileutils'
 
 class MilestoneResult
   attr_accessor :applicable, :frameWhenAchieved, :complete
@@ -48,10 +50,24 @@ def frames_to_display(frames)
   end
 end
 
-def json_from_url(url)
-  http_result = Curl::Easy.perform(url)
-  json_result = http_result.body_str
-  JSON.parse(json_result)
+def cache_key(url)
+  Digest::hexencode(Digest::SHA256.digest(url))
+end
+
+def cache_dir
+  '/tmp/dork_cache'
+end
+
+def retrieve_json(url)
+  FileUtils::mkdir_p cache_dir
+  cache_path = cache_dir + '/' + cache_key(url)
+  begin
+    url_string = File.read(cache_path)
+  rescue
+    url_string = Curl::Easy.perform(url).body_str
+    File.write(cache_path, url_string)
+  end
+  JSON.parse(url_string)
 end
 
 def race_name(race_char)
@@ -177,9 +193,7 @@ def analyze_match(the_match, milestone_achieved_counter, milestone_applicable_co
   enemy_entity = entities.reject{|entity| entity['race'] == 'P'}[0]
 
   # get match blob
-  http_result = Curl::Easy.perform($ggtracker_blob_url_prefix + "#{the_match['id']}")
-  json_result = http_result.body_str
-  matchblob = JSON.parse(json_result)
+  matchblob = retrieve_json($ggtracker_blob_url_prefix + "#{the_match['id']}")
 
   # get our base start times
   our_base_lives = matchblob['num_bases'].select{|part| part[0] == $player_id}[0][1]
@@ -338,7 +352,7 @@ if $match_id.nil?
     puts ""
   }
 else
-  the_match = json_from_url($ggtracker_api_url_prefix + "/matches/#{$match_id}.json")
+  the_match = retrieve_json($ggtracker_api_url_prefix + "/matches/#{$match_id}.json")
   analyze_match(the_match, milestone_achieved_counter, milestone_applicable_counter)
 end
 
