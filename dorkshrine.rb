@@ -58,14 +58,40 @@ def cache_dir
   '/tmp/dork_cache'
 end
 
-def retrieve_json(url)
-  FileUtils::mkdir_p cache_dir
+def cache_path_for_url(url)
   cache_path = cache_dir + '/' + cache_key(url)
+end
+
+def retrieve_from_url_and_cache(url)
+  url_string = Curl::Easy.perform(url).body_str
+  cache_path = cache_path_for_url(url)
+  File.write(cache_path, url_string)
+end
+
+def retrieve_from_cache(url)
+  FileUtils::mkdir_p cache_dir
+  cache_path = cache_path_for_url(url)
   begin
     url_string = File.read(cache_path)
   rescue
-    url_string = Curl::Easy.perform(url).body_str
-    File.write(cache_path, url_string)
+    url_string = nil
+  end
+  url_string
+end
+
+def retrieve_json(url, cache_preferred=true)
+  if cache_preferred
+    begin
+      url_string = retrieve_from_cache(url)
+    rescue
+      url_string = retrieve_from_url_and_cache(url)
+    end
+  else
+    begin
+      url_string = retrieve_from_url_and_cache(url)
+    rescue
+      url_string = retrieve_from_cache(url)
+    end
   end
   JSON.parse(url_string)
 end
@@ -363,10 +389,10 @@ milestone_applicable_counter = Array.new(MILESTONES.count, 0)
 
 if $match_id.nil?
   if $anyrace
-    matches = retrieve_json($ggtracker_api_url_prefix + "matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&game_type=1v1&limit=#{$num_to_show}")
+    matches = retrieve_json($ggtracker_api_url_prefix + "matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&game_type=1v1&limit=#{$num_to_show}", false)
   else
     # get latest PvZ for the indicated player
-    matches = retrieve_json($ggtracker_api_url_prefix + "matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&race=protoss&vs_race=zerg&game_type=1v1&limit=#{$num_to_show}")
+    matches = retrieve_json($ggtracker_api_url_prefix + "matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&race=protoss&vs_race=zerg&game_type=1v1&limit=#{$num_to_show}", false)
   end
   matches["collection"].each {|match|
     analyze_match(match, milestone_achieved_counter, milestone_applicable_counter)
