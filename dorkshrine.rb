@@ -330,6 +330,7 @@ $num_to_show = 1
 OptionParser.new do |o|
   o.on('-m GGTRACKER_MATCH_ID') { |match_id| $match_id = match_id.to_i }
   o.on('-p GGTRACKER_PLAYER_ID') { |player_id| $player_id = player_id.to_i }
+  o.on('-a') { |anyrace| $anyrace = anyrace }
   o.on('-n num_to_show') { |num_to_show| $num_to_show = num_to_show.to_i }
   o.on('-d') {
     $ggtracker_api_url_prefix = "http://localhost:9292/api/v1/"
@@ -349,8 +350,12 @@ milestone_achieved_counter = Array.new(MILESTONES.count, 0)
 milestone_applicable_counter = Array.new(MILESTONES.count, 0)
 
 if $match_id.nil?
-  # get latest PvZ for the indicated player
-  matches = json_from_url($ggtracker_api_url_prefix + "matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&race=protoss&vs_race=zerg&game_type=1v1&limit=#{$num_to_show}")
+  if $anyrace
+    matches = retrieve_json($ggtracker_api_url_prefix + "matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&game_type=1v1&limit=#{$num_to_show}")
+  else
+    # get latest PvZ for the indicated player
+    matches = retrieve_json($ggtracker_api_url_prefix + "matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&race=protoss&vs_race=zerg&game_type=1v1&limit=#{$num_to_show}")
+  end
   matches["collection"].each {|match|
     analyze_match(match, milestone_achieved_counter, milestone_applicable_counter)
     puts ""
