@@ -200,6 +200,13 @@ def analyze_match(the_match, milestone_achieved_counter, milestone_applicable_co
   matchblob = retrieve_json($ggtracker_blob_url_prefix + "#{the_match['id']}")
 
   # get our base start times
+  #
+  # TODO fix this to actually look at the base start time rather than
+  # working backward from when it was completed.
+  #
+  # Because sometimes bases are destroyed before complete, or the game
+  # ends.  But the benchmark is supposed to be the base *start* time.
+  #
   our_base_lives = matchblob['num_bases'].select{|part| part[0] == $player_id}[0][1]
   ets = expansion_times(our_base_lives)
   ets = ets.map{|et| [0, et - BASE_BUILD_FRAMES].max}
