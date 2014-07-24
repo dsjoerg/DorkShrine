@@ -214,7 +214,10 @@ def analyze_match(the_match, milestone_achieved_counter, milestone_applicable_co
     first_aggressive_frame = 0
   else
     our_aggression = aggressions[$player_id.to_s]
-    first_aggressive_snapshot = our_aggression.find{|snapshot| snapshot[2] > 1000}
+#    our_aggression.each{|snapshot|
+#      puts "#{frames_to_display(snapshot[0])}: #{snapshot}"
+#    }
+    first_aggressive_snapshot = our_aggression.find{|snapshot| snapshot[2] > 1000 || snapshot[1] > 1000}
     if first_aggressive_snapshot.nil?
       first_aggressive_frame = 0
     else
