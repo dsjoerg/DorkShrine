@@ -39,6 +39,9 @@ class MilestoneNotApplicableResult < MilestoneResult
   end
 end
 def minutes_to_display(minutes)
+  if minutes < 0
+    return "-" + minutes_to_display(-1 * minutes)
+  end
   minutes.to_i.to_s + ':' + ('%02i' % (60 * minutes.modulo(1)))
 end
 
@@ -46,10 +49,10 @@ def seconds_to_display(seconds)
   minutes_to_display(seconds / 60.0)
 end
 
-def frames_to_display(frames)
+def frames_to_display(frames, subzero_permitted=false)
   if frames.nil?
     "never"
-  elsif frames <= 0
+  elsif frames <= 0 and !subzero_permitted
     "never"
   else
     minutes_to_display(frames / (16.0 * 60.0))
