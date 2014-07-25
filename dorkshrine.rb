@@ -32,6 +32,12 @@ class ArmyBasedMilestoneResult < MilestoneResult
   end
 end
 
+class MilestoneNotApplicableResult < MilestoneResult
+  def initialize
+    @applicable = false
+    @complete = false
+  end
+end
 def minutes_to_display(minutes)
   minutes.to_i.to_s + ':' + ('%02i' % (60 * minutes.modulo(1)))
 end
@@ -149,7 +155,11 @@ MILESTONES = [
     }],
   [ "Third base started", 8, 8,
     Proc.new{|match, now|
-      FixedMilestoneResult.new(match["third_base"])
+      if match['duration_seconds'] < BASE_BUILD_SECONDS + (8 * 60) + 8
+        MilestoneNotApplicableResult.new()
+      else
+        FixedMilestoneResult.new(match["third_base"])
+      end
     }],
   [ "Harass enemy", 9, 1,
     Proc.new{|match, now|
@@ -290,7 +300,7 @@ def analyze_match(the_match, milestone_achieved_counter, milestone_applicable_co
     MILESTONES.each_with_index{ |milestone, i|
       if milestone_results[i].nil?
         milestone_result = milestone[3].call(the_match, event[0])
-        if milestone_result && milestone_result.complete
+        if milestone_result && (milestone_result.complete || !milestone_result.applicable)
           milestone_results[i] = milestone_result
         end
       end
