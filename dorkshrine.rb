@@ -185,7 +185,7 @@ MILESTONES = [
     }],
   [ "Harass enemy", 9, 1,
     Proc.new{|match, now|
-      FixedMilestoneResult.new(match["first_aggressive_frame"])
+      FixedMilestoneResult.new(match["our_first_aggression"])
     }],
   [ "+1 attack complete", 9, 49,
     Proc.new{|match, now|
@@ -235,11 +235,27 @@ def expansion_times(base_lives)
   return [two_base_frame, three_base_frame]
 end
 
+def first_aggressive_frame(aggression, min_army_size)
+  return 0 if aggression.nil?
+
+  first_aggressive_snapshot = aggression.find{|snapshot| snapshot[2] > min_army_size || snapshot[1] > min_army_size}
+
+  if first_aggressive_snapshot.nil?
+    0
+  else
+    first_aggressive_snapshot[0]
+  end
+end
+
 FRAMES_PER_SECOND = 16
 GOAL_SLIPPAGE_SECONDS_PERMITTED = 30
-BASE_BUILD_FRAMES = 100 * FRAMES_PER_SECOND
+BASE_BUILD_SECONDS = 100
+BASE_BUILD_FRAMES = BASE_BUILD_SECONDS * FRAMES_PER_SECOND
 
-def analyze_match(the_match, milestone_achieved_counter, milestone_applicable_counter)
+# if you never hit a milestone, that counts as a 5-minute miss for our purposes
+NEVER_SECONDS_VALUE = 300
+
+def analyze_match(the_match, achieved_counter, applicable_counter, sum_miss_frames)
 
   entities = the_match['entities']
   if $player_id
@@ -253,6 +269,7 @@ def analyze_match(the_match, milestone_achieved_counter, milestone_applicable_co
   end
   $player_id = our_entity['identity']['id']
   enemy_entity = entities.reject{|entity| entity == our_entity}[0]
+  enemy_id = enemy_entity['identity']['id']
 
   # get match blob
   matchblob = retrieve_json($ggtracker_blob_url_prefix + "#{the_match['id']}")
@@ -276,22 +293,12 @@ def analyze_match(the_match, milestone_achieved_counter, milestone_applicable_co
   if aggressions.nil?
     puts "Please re-upload this replay to GGTracker to get information about aggression/harassment."
     # TODO make aggression not-applicable
-    first_aggressive_frame = 0
+    the_match['our_first_aggression'] = 0
+    the_match['enemy_first_aggression'] = 0
   else
-    our_aggression = aggressions[$player_id.to_s]
-#    our_aggression.each{|snapshot|
-#      puts "#{frames_to_display(snapshot[0])}: #{snapshot}"
-#    }
-    first_aggressive_snapshot = our_aggression.find{|snapshot| snapshot[2] > 1000 || snapshot[1] > 1000}
-    if first_aggressive_snapshot.nil?
-      first_aggressive_frame = 0
-    else
-      first_aggressive_frame = first_aggressive_snapshot[0]
-    end
+    the_match['our_first_aggression'] = first_aggressive_frame(aggressions[$player_id.to_s], 1000)
+    the_match['enemy_first_aggression'] = first_aggressive_frame(aggressions[enemy_id.to_s], 500)
   end
-  the_match['first_aggressive_frame'] = first_aggressive_frame
-
-  
 
   # get scouting time
   scouting_info = matchblob['scouting']
@@ -379,6 +386,7 @@ def analyze_match(the_match, milestone_achieved_counter, milestone_applicable_co
     puts "%-30s %5s %12s (goal: %5s)" % [milestone_achieved[0], frames_to_display(milestone_achieved[1]), milestone_achieved[3], frames_to_display(milestone_achieved[2])]
   }
 
+  puts "%-30s %s" % ["Enemy first aggression", frames_to_display(the_match['enemy_first_aggression'])]
   puts "%-30s %s" % ["Game over", seconds_to_display(the_match['duration_seconds'])]
   puts "%-30s %s" % ["Result", our_entity['win'] ? 'VICTORY' : 'DEFEAT']
   puts "%-30s %s" % ["Match", "http://ggtracker.com/matches/#{the_match['id']}"]
