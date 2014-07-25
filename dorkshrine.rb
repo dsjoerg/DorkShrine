@@ -277,7 +277,8 @@ def analyze_match(the_match, achieved_counter, applicable_counter, sum_miss_fram
   # get our base start times
   #
   # TODO fix this to actually look at the base start time rather than
-  # working backward from when it was completed.
+  # working backward from when it was completed.  Requires change to
+  # dsjoerg/ggpyjobs.
   #
   # Because sometimes bases are destroyed before complete, or the game
   # ends.  But the benchmark is supposed to be the base *start* time.
