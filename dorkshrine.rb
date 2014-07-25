@@ -345,17 +345,23 @@ def analyze_match(the_match, achieved_counter, applicable_counter, sum_miss_fram
       goal_grade = "    N/A     "
     elsif the_match['duration_seconds'] < (goal_frames / FRAMES_PER_SECOND)
       goal_grade = "    N/A     "
-    elsif milestone_results[i].nil? || milestone_results[i].frameWhenAchieved == 0 || milestone_results[i].frameWhenAchieved.nil? || milestone_results[i].frameWhenAchieved > goal_frames + (GOAL_SLIPPAGE_SECONDS_PERMITTED * FRAMES_PER_SECOND)
-      milestone_applicable_counter[i] += 1
-      goal_grade = "WORK ON THIS"
-    elsif milestone_results[i].frameWhenAchieved < goal_frames - (GOAL_SLIPPAGE_SECONDS_PERMITTED * FRAMES_PER_SECOND)
-      goal_grade = "  TOO FAST  "
-      milestone_applicable_counter[i] += 1
-      milestone_achieved_counter[i] += 1
     else
-      goal_grade = "   GOOD     "
-      milestone_applicable_counter[i] += 1
-      milestone_achieved_counter[i] += 1
+      applicable_counter[i] += 1
+      if milestone_results[i].nil? or milestone_results[i].frameWhenAchieved <= 0
+        sum_miss_frames[i] += NEVER_SECONDS_VALUE * FRAMES_PER_SECOND
+      else
+        sum_miss_frames[i] += [milestone_results[i].frameWhenAchieved - goal_frames, NEVER_SECONDS_VALUE * FRAMES_PER_SECOND].min
+      end
+
+      if milestone_results[i].nil? || milestone_results[i].frameWhenAchieved == 0 || milestone_results[i].frameWhenAchieved.nil? || milestone_results[i].frameWhenAchieved > goal_frames + (GOAL_SLIPPAGE_SECONDS_PERMITTED * FRAMES_PER_SECOND)
+        goal_grade = "WORK ON THIS"
+      elsif milestone_results[i].frameWhenAchieved < goal_frames - (GOAL_SLIPPAGE_SECONDS_PERMITTED * FRAMES_PER_SECOND)
+        goal_grade = "  TOO FAST  "
+        achieved_counter[i] += 1
+      else
+        goal_grade = "   GOOD     "
+        achieved_counter[i] += 1
+      end
     end
 
     milestones_achieved <<
@@ -423,9 +429,9 @@ if $player_id.nil? == $match_id.nil?
 end
 
 # for each benchmark track how many times you got at least a good
-
-milestone_achieved_counter = Array.new(MILESTONES.count, 0)
-milestone_applicable_counter = Array.new(MILESTONES.count, 0)
+achieved_counter = Array.new(MILESTONES.count, 0)
+applicable_counter = Array.new(MILESTONES.count, 0)
+sum_miss_frames = Array.new(MILESTONES.count, 0)
 
 if $match_id.nil?
   if $anyrace
@@ -435,18 +441,18 @@ if $match_id.nil?
     matches = retrieve_json($ggtracker_api_url_prefix + "matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&race=protoss&vs_race=zerg&game_type=1v1&limit=#{$num_to_show}", false)
   end
   matches["collection"].each {|match|
-    analyze_match(match, milestone_achieved_counter, milestone_applicable_counter)
+    analyze_match(match, achieved_counter, applicable_counter, sum_miss_frames)
     puts ""
   }
 else
-  the_match = retrieve_json($ggtracker_api_url_prefix + "/matches/#{$match_id}.json")
-  analyze_match(the_match, milestone_achieved_counter, milestone_applicable_counter)
+  the_match = retrieve_json($ggtracker_api_url_prefix + "matches/#{$match_id}.json")
+  analyze_match(the_match, achieved_counter, applicable_counter, sum_miss_frames)
 end
 
 if $num_to_show > 1
   puts "SUMMARY"
   puts "-------"
   MILESTONES.each_with_index {|milestone, i|
-    puts "%-30s %3.0f%%    (%i/%i)" % [milestone[0], 100.0 * milestone_achieved_counter[i] / milestone_applicable_counter[i], milestone_achieved_counter[i], milestone_applicable_counter[i]]
+    puts "%-30s %3.0f%%  %5s   (%i/%i)" % [milestone[0], 100.0 * achieved_counter[i] / applicable_counter[i], frames_to_display(sum_miss_frames[i] / applicable_counter[i], true), achieved_counter[i], applicable_counter[i]]
   }
 end
