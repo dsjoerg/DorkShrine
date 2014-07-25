@@ -38,6 +38,11 @@ class MilestoneNotApplicableResult < MilestoneResult
     @complete = false
   end
 end
+
+def debug(message)
+#  $stderr.puts message
+end
+
 def minutes_to_display(minutes)
   if minutes < 0
     return "-" + minutes_to_display(-1 * minutes)
@@ -74,35 +79,49 @@ end
 def retrieve_from_url_and_cache(url)
   url_string = Curl::Easy.perform(url).body_str
   cache_path = cache_path_for_url(url)
+  FileUtils::mkdir_p cache_dir
   File.write(cache_path, url_string)
+  url_string
 end
 
 def retrieve_from_cache(url)
-  FileUtils::mkdir_p cache_dir
   cache_path = cache_path_for_url(url)
   begin
     url_string = File.read(cache_path)
-  rescue
+  rescue Exception => e
+    debug "cache file for #{url} not found, exception was #{e}"
     url_string = nil
   end
   url_string
 end
 
 def retrieve_json(url, cache_preferred=true)
+  debug "Retrieving #{url}"
   if cache_preferred
     begin
       url_string = retrieve_from_cache(url)
-    rescue
-      url_string = retrieve_from_url_and_cache(url)
+    rescue Exception => e
+      debug "#{url} not found in cache, falling back to network. Exception was #{e}"
     end
+    url_string ||= retrieve_from_url_and_cache(url)
   else
     begin
       url_string = retrieve_from_url_and_cache(url)
-    rescue
-      url_string = retrieve_from_cache(url)
+    rescue Exception => e
+      debug "#{url} not found on network, falling back to cache. Exception was #{e}"
+    end
+    url_string ||= retrieve_from_cache(url)
+  end
+  if url_string.nil?
+    debug "Couldnt get anything from #{url}, cache_preferred = #{cache_preferred}."
+  else
+    begin
+      json_result = JSON.parse(url_string)
+    rescue Exception => e
+      debug "Error while trying to parse result from #{url}: #{e}"
     end
   end
-  JSON.parse(url_string)
+  json_result
 end
 
 def race_name(race_char)
