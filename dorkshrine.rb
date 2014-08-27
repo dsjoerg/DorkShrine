@@ -150,8 +150,8 @@ def describe_enemy(entity)
   "#{controller} #{race_name(entity['race'])}"
 end
 
-# from ./dorkshrine.rb -m 5116849
-MILESTONES = [
+# from ./dorkshrine.rb -m 5116849 -b PVZ_SENTRY_MACRO
+PVZ_SENTRY_MACRO_MILESTONES = [
   [ "First scout command", 1, 13,
     Proc.new{|match, now|
       FixedMilestoneResult.new(match["first_scout_command_frame"])
@@ -177,7 +177,7 @@ MILESTONES = [
     }],
   [ "Third base started", 8, 8,
     Proc.new{|match, now|
-      if match['duration_seconds'] < BASE_BUILD_SECONDS + (8 * 60) + 8
+      if match['duration_seconds'] < (8 * 60) + 8
         MilestoneNotApplicableResult.new()
       else
         FixedMilestoneResult.new(match["third_base"])
@@ -212,6 +212,40 @@ MILESTONES = [
     }],
 ]
 
+# from ./dorkshrine.rb -m 5283154 -b PVP_4GATE
+PVP_4GATE_MILESTONES = [
+  [ "Zealot", 3, 47,
+    Proc.new{|match, now|
+      army = match["army"]
+      ArmyBasedMilestoneResult.new(army["zealot"] >= 1.0, now)
+    }],
+  [ "First Stalker", 4, 20,
+    Proc.new{|match, now|
+      army = match["army"]
+      ArmyBasedMilestoneResult.new(army["stalker"] >= 1.0, now)
+    }],
+  [ "Second Stalker", 5, 14,
+    Proc.new{|match, now|
+      army = match["army"]
+      ArmyBasedMilestoneResult.new(army["stalker"] >= 2.0, now)
+    }],
+  [ "Warpgate Research", 5, 32,
+    Proc.new{|match, now|
+      warpgate = match['our_upgrades'].find{|upgrade| upgrade[0] == 'WarpGateResearch'}
+      if warpgate.nil?
+        nil
+      else
+        FixedMilestoneResult.new(warpgate[1])
+      end
+    }],
+  [ "Six Stalkers whoa!", 5, 50,
+    Proc.new{|match, now|
+      army = match["army"]
+      ArmyBasedMilestoneResult.new(army["zealot"] >= 1.0 && army["stalker"] >= 6.0, now)
+    }],
+]
+
+
 def expansion_times(base_lives)
   two_base_frame = 0
   three_base_frame = 0
@@ -219,7 +253,7 @@ def expansion_times(base_lives)
   num_bases = 0
   events = []
   base_lives.each { |base_life|
-    events << [base_life[0], +1]
+    events << [base_life[2], +1]
     events << [base_life[1], -1]
   }
   events.sort!{|a,b| a[0] <=> b[0]}
@@ -249,13 +283,11 @@ end
 
 FRAMES_PER_SECOND = 16
 GOAL_SLIPPAGE_SECONDS_PERMITTED = 30
-BASE_BUILD_SECONDS = 100
-BASE_BUILD_FRAMES = BASE_BUILD_SECONDS * FRAMES_PER_SECOND
 
 # if you never hit a milestone, that counts as a 5-minute miss for our purposes
 NEVER_SECONDS_VALUE = 300
 
-def analyze_match(the_match, achieved_counter, applicable_counter, sum_miss_frames)
+def analyze_match(the_match, achieved_counter, applicable_counter, sum_miss_frames, milestones)
 
   entities = the_match['entities']
   if $player_id
@@ -274,18 +306,23 @@ def analyze_match(the_match, achieved_counter, applicable_counter, sum_miss_fram
   # get match blob
   matchblob = retrieve_json($ggtracker_blob_url_prefix + "#{the_match['id']}")
 
+  return if matchblob.nil?
+
+  # get match note
+#
+# this is more work than you want to do right now, because matchnotes
+# are private so you'd need to log in to ggtracker, and let the user
+# specify their ggtracker credentials on the command line.
+#
+#  matchnote = retrieve_json($ggtracker_url_prefix + "matches/#{the_match['id']}/matchnote")
+#  if not matchnote.nil? and matchnote["status"] != "error"
+#    puts matchnote
+#  end
+
   # get our base start times
-  #
-  # TODO fix this to actually look at the base start time rather than
-  # working backward from when it was completed.  Requires change to
-  # dsjoerg/ggpyjobs.
-  #
-  # Because sometimes bases are destroyed before complete, or the game
-  # ends.  But the benchmark is supposed to be the base *start* time.
-  #
   our_base_lives = matchblob['num_bases'].select{|part| part[0] == $player_id}[0][1]
   ets = expansion_times(our_base_lives)
-  ets = ets.map{|et| [0, et - BASE_BUILD_FRAMES].max}
+  ets = ets.map{|et| [0, et].max}
   the_match['second_base'] = ets[0]
   the_match['third_base'] = ets[1]
 
@@ -327,7 +364,7 @@ def analyze_match(the_match, achieved_counter, applicable_counter, sum_miss_fram
   # at each time if a milestone has been hit
   the_events.each{ |event|
     the_match['army'][event[1]] += event[2]
-    MILESTONES.each_with_index{ |milestone, i|
+    milestones.each_with_index{ |milestone, i|
       if milestone_results[i].nil?
         milestone_result = milestone[3].call(the_match, event[0])
         if milestone_result && (milestone_result.complete || !milestone_result.applicable)
@@ -339,7 +376,7 @@ def analyze_match(the_match, achieved_counter, applicable_counter, sum_miss_fram
 
   milestones_achieved = []
 
-  MILESTONES.each_with_index {|milestone, i|
+  milestones.each_with_index {|milestone, i|
     goal_seconds = milestone[1] * 60 + milestone[2]
     goal_frames = goal_seconds * FRAMES_PER_SECOND
     if milestone_results[i] && !milestone_results[i].applicable
@@ -408,6 +445,7 @@ end
 
 
 $ggtracker_api_url_prefix = "http://api.ggtracker.com/api/v1/"
+$ggtracker_url_prefix = "http://ggtracker.com/"
 $ggtracker_blob_url_prefix = "https://gg2-matchblobs-prod.s3.amazonaws.com/"
 
 $num_to_show = 1
@@ -415,7 +453,7 @@ $num_to_show = 1
 OptionParser.new do |o|
   o.on('-m GGTRACKER_MATCH_ID') { |match_id| $match_id = match_id.to_i }
   o.on('-p GGTRACKER_PLAYER_ID') { |player_id| $player_id = player_id.to_i }
-  o.on('-a') { |anyrace| $anyrace = anyrace }
+  o.on('-b build') { |build| $build = build }
   o.on('-n num_to_show') { |num_to_show| $num_to_show = num_to_show.to_i }
   o.on('-d') {
     $ggtracker_api_url_prefix = "http://localhost:9292/api/v1/"
@@ -424,36 +462,53 @@ OptionParser.new do |o|
   o.on('-h') { puts o; exit }
   o.parse!
 end
+usage = "Usage: dorkshrine.rb -b <build_name> [-p <player_id> [-n num_to_show] | -m <match_id>]"
+
+if $build == 'PVP_4GATE'
+  milestones = PVP_4GATE_MILESTONES
+  enemy_race = 'protoss'
+elsif $build == 'PVZ_SENTRY_MACRO'
+  milestones = PVZ_SENTRY_MACRO_MILESTONES
+  enemy_race = 'zerg'
+else
+  $stderr.puts usage
+  exit
+end
+
 if $player_id.nil? == $match_id.nil?
-  $stderr.puts "Usage: dorkshrine.rb [-p <player_id> [-n num_to_show] | -m <match_id>]"
+  $stderr.puts usage
   exit
 end
 
 # for each benchmark track how many times you got at least a good
-achieved_counter = Array.new(MILESTONES.count, 0)
-applicable_counter = Array.new(MILESTONES.count, 0)
-sum_miss_frames = Array.new(MILESTONES.count, 0)
+achieved_counter = Array.new(milestones.count, 0)
+applicable_counter = Array.new(milestones.count, 0)
+sum_miss_frames = Array.new(milestones.count, 0)
 
 if $match_id.nil?
-  if $anyrace
-    matches = retrieve_json($ggtracker_api_url_prefix + "matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&game_type=1v1&limit=#{$num_to_show}", false)
-  else
-    # get latest PvZ for the indicated player
-    matches = retrieve_json($ggtracker_api_url_prefix + "matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&race=protoss&vs_race=zerg&game_type=1v1&limit=#{$num_to_show}", false)
-  end
+  # get latest matches for the indicated player
+  matches = retrieve_json($ggtracker_api_url_prefix + "matches?game_type=1v1&identity_id=#{$player_id}&page=1&paginate=true&race=protoss&vs_race=#{enemy_race}&game_type=1v1&limit=#{$num_to_show}", false)
+
   matches["collection"].each {|match|
-    analyze_match(match, achieved_counter, applicable_counter, sum_miss_frames)
+    analyze_match(match, achieved_counter, applicable_counter, sum_miss_frames, milestones)
     puts ""
   }
 else
   the_match = retrieve_json($ggtracker_api_url_prefix + "matches/#{$match_id}.json")
-  analyze_match(the_match, achieved_counter, applicable_counter, sum_miss_frames)
+  analyze_match(the_match, achieved_counter, applicable_counter, sum_miss_frames, milestones)
 end
 
 if $num_to_show > 1
   puts "SUMMARY"
   puts "-------"
-  MILESTONES.each_with_index {|milestone, i|
-    puts "%-30s %3.0f%%  %5s   (%i/%i)" % [milestone[0], 100.0 * achieved_counter[i] / applicable_counter[i], frames_to_display(sum_miss_frames[i] / applicable_counter[i], true), achieved_counter[i], applicable_counter[i]]
+  milestones.each_with_index {|milestone, i|
+    if applicable_counter[i] > 0
+      achieved_percent = 100.0 * achieved_counter[i] / applicable_counter[i]
+      missed_average_frames = sum_miss_frames[i] / applicable_counter[i]
+    else
+      achieved_percent = 0
+      missed_average_frames = 0
+    end
+    puts "%-30s %3.0f%%  %5s   (%i/%i)" % [milestone[0], achieved_percent, frames_to_display(missed_average_frames, true), achieved_counter[i], applicable_counter[i]]
   }
 end
