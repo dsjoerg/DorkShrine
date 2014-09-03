@@ -245,6 +245,40 @@ PVP_4GATE_MILESTONES = [
     }],
 ]
 
+# from ./dorkshrine.rb -m 5284225 -b PVT_3G_ROBO
+PVT_3G_ROBO_MILESTONES = [
+  [ "First Stalker", 4, 20,
+    Proc.new{|match, now|
+      army = match["army"]
+      ArmyBasedMilestoneResult.new(army["stalker"] >= 1.0, now)
+    }],
+  [ "MSC", 4, 31,
+    Proc.new{|match, now|
+      army = match["army"]
+      ArmyBasedMilestoneResult.new(army["mothershipcore"] >= 1.0, now)
+    }],
+  [ "Second Stalker", 5, 02,
+    Proc.new{|match, now|
+      army = match["army"]
+      ArmyBasedMilestoneResult.new(army["stalker"] >= 2.0, now)
+    }],
+  [ "First Sentry", 5, 39,
+    Proc.new{|match, now|
+      army = match["army"]
+      ArmyBasedMilestoneResult.new(army["sentry"] >= 1.0, now)
+    }],
+  [ "Observer", 6, 02,
+    Proc.new{|match, now|
+      army = match["army"]
+      ArmyBasedMilestoneResult.new(army["observer"] >= 1.0, now)
+    }],
+  [ "IMMORTAL!", 6, 47,
+    Proc.new{|match, now|
+      army = match["army"]
+      ArmyBasedMilestoneResult.new(army["immortal"] >= 1.0, now)
+    }],
+]
+
 
 def expansion_times(base_lives)
   two_base_frame = 0
@@ -470,6 +504,9 @@ if $build == 'PVP_4GATE'
 elsif $build == 'PVZ_SENTRY_MACRO'
   milestones = PVZ_SENTRY_MACRO_MILESTONES
   enemy_race = 'zerg'
+elsif $build == 'PVT_3G_ROBO'
+  milestones = PVT_3G_ROBO_MILESTONES
+  enemy_race = 'terran'
 else
   $stderr.puts usage
   exit
